@@ -32,6 +32,7 @@ To run this application locally, follow these steps:
    ```
    streamlit run app.py
    ```
+4. app link:-https://stockmarket-prediction-6bfe2nm38v9u5zddtwj6dx.streamlit.app/
 
 ## Usage
 
