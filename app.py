@@ -23,7 +23,7 @@ ticker_options = {
 }
 selected_company = st.sidebar.selectbox("Select a Company", list(ticker_options.keys()))
 ticker = ticker_options[selected_company]
-period = st.sidebar.slider("Prediction Period (in days)", 30, 365, 90)
+period = st.sidebar.slider("Prediction Period (in days)", 30, 365, 120)
 
 # Fetch stock data
 try:
@@ -53,12 +53,25 @@ try:
     fig1 = model.plot(forecast)
     st.write(fig1)
 
-    # Interactive Plot with Plotly
+    # Interactive Plot with Plotly (Zoom and Slide Enabled)
     st.subheader(f"Interactive Plot for {selected_company} ({ticker})")
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=prophet_data["ds"], y=prophet_data["y"], name="Actual"))
     fig.add_trace(go.Scatter(x=forecast["ds"], y=forecast["yhat"], name="Predicted", line=dict(color="green")))
-    fig.update_layout(title=f"{selected_company} Stock Price Prediction", xaxis_title="Date", yaxis_title="Price")
+    fig.update_layout(
+        title=f"{selected_company} Stock Price Prediction",
+        xaxis_title="Date",
+        yaxis_title="Price",
+        xaxis_rangeslider_visible=True,  # Enable range slider
+        xaxis=dict(rangeselector=dict(  # Add zoom buttons
+            buttons=list([
+                dict(count=1, label="1m", step="month", stepmode="backward"),
+                dict(count=6, label="6m", step="month", stepmode="backward"),
+                dict(count=1, label="1y", step="year", stepmode="backward"),
+                dict(step="all")
+            ])
+        ))
+    )
     st.plotly_chart(fig)
 
     # Display forecasted data in a scrollable table
@@ -71,6 +84,48 @@ try:
 
     # Display the table
     st.dataframe(filtered_forecast[["Date", "Predicted Price"]], height=400)  # Scrollable table with a fixed height
+
+    # Add links to trusted stock trading platforms
+    st.subheader("Proceed to Buy or Sell Stocks")
+    st.write("You can buy or sell stocks on trusted platforms. Click the buttons below to proceed:")
+
+    # Create columns for buttons
+    col1, col2, col3 = st.columns(3)
+
+    # Add buttons with links
+    with col1:
+        st.markdown(
+            """
+            <a href="https://robinhood.com" target="_blank">
+                <button style="background-color:green;color:white;padding:10px 20px;border:none;border-radius:5px;cursor:pointer;">
+                    Robinhood
+                </button>
+            </a>
+            """,
+            unsafe_allow_html=True
+        )
+    with col2:
+        st.markdown(
+            """
+            <a href="https://us.etrade.com" target="_blank">
+                <button style="background-color:blue;color:white;padding:10px 20px;border:none;border-radius:5px;cursor:pointer;">
+                    E*TRADE
+                </button>
+            </a>
+            """,
+            unsafe_allow_html=True
+        )
+    with col3:
+        st.markdown(
+            """
+            <a href="https://zerodha.com" target="_blank">
+                <button style="background-color:red;color:white;padding:10px 20px;border:none;border-radius:5px;cursor:pointer;">
+                    Zerodha
+                </button>
+            </a>
+            """,
+            unsafe_allow_html=True
+        )
 
 except Exception as e:
     st.error(f"Error: {e}")
