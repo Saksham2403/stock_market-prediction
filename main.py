@@ -1,103 +1,100 @@
-# pip install streamlit prophet yfinance plotly pandas
 import streamlit as st
-from datetime import date, timedelta
-import yfinance as yf
 from prophet import Prophet
-from prophet.plot import plot_plotly
-from plotly import graph_objs as go
 import pandas as pd
+import yfinance as yf
+import plotly.graph_objects as go
 
-# Define constants
-TODAY = date.today().strftime("%Y-%m-%d")
-START = (date.today() - timedelta(days=4 * 365)).strftime("%Y-%m-%d")  # Start date is 4 years ago
+# App title
+st.title("Stock Price Prediction Application")
+st.write("""
+This app predicts stock prices for Apple (AAPL), Microsoft (MSFT), Google (GOOGL), Amazon (AMZN), Tesla (TSLA), Reliance (RELIANCE.NS), and Tata Motors (TATAMOTORS.NS) using Facebook's Prophet library.
+""")
 
-# Streamlit app title
-st.title('Stock Price Prediction App')
+# Sidebar for user input
+st.sidebar.header("User Input")
+ticker_options = {
+    "Apple": "AAPL",
+    "Microsoft": "MSFT",
+    "Google": "GOOGL",
+    "Amazon": "AMZN",
+    "Tesla": "TSLA",
+    "Reliance": "RELIANCE.NS",
+    "Tata Motors": "TATAMOTORS.NS"
+}
+selected_company = st.sidebar.selectbox("Select a Company", list(ticker_options.keys()))
+ticker = ticker_options[selected_company]
+period = st.sidebar.slider("Prediction Period (in days)", 30, 365, 120)
 
-# Stock selection
-stocks = ('GOOG', 'AAPL', 'MSFT', 'GME')
-selected_stock = st.selectbox('Select dataset for prediction', stocks)
-
-# Prediction period (1 year)
-n_years = st.slider('Years of prediction:', 1, 4)
-period = n_years * 365
-
-# Function to load data
-@st.cache_data
-def load_data(ticker):
-    data = yf.download(ticker, START, TODAY)
+# Fetch stock data
+try:
+    st.subheader(f"Stock Data for {selected_company} ({ticker})")
+    # Fetch stock data for the last 5 years
+    data = yf.download(ticker, period="5y")
     data.reset_index(inplace=True)
-    return data
 
-# Load data
-data_load_state = st.text('Loading data...')
-data = load_data(selected_stock)
-data_load_state.text('Loading data... done!')
+    # Display raw data (last 5 rows with Open, Close, and Volume)
+    st.write("Last 5 rows of stock data (with Open, Close, and Volume):")
+    st.write(data[["Date", "Open", "Close", "Volume"]].tail())
 
-# Validate data
-if data.empty:
-    st.error("Failed to fetch data for the selected stock. Please try another stock.")
-    st.stop()
+    # Prepare data for Prophet (only Date and Close are used for prediction)
+    prophet_data = data[["Date", "Close"]]
+    prophet_data.columns = ["ds", "y"]
 
-# Ensure the 'Date' column is in datetime format
-data['Date'] = pd.to_datetime(data['Date'])
+    # Train Prophet model
+    model = Prophet()
+    model.fit(prophet_data)
 
-# Display raw data
-st.subheader('Raw data (Last 4 Years)')
-st.write(data.tail())
+    # Create future dataframe
+    future = model.make_future_dataframe(periods=period)
+    forecast = model.predict(future)
 
-# Plot raw data
-def plot_raw_data():
+    # Plot results
+    st.subheader(f"Prediction Results for {selected_company} ({ticker})")
+    fig1 = model.plot(forecast)
+    st.write(fig1)
+
+    # Interactive Plot with Plotly (Zoom and Slide Enabled)
+    st.subheader(f"Interactive Plot for {selected_company} ({ticker})")
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=data['Date'], y=data['Close'], mode='lines', name="Stock Close"))
+    fig.add_trace(go.Scatter(x=prophet_data["ds"], y=prophet_data["y"], name="Actual"))
+    fig.add_trace(go.Scatter(x=forecast["ds"], y=forecast["yhat"], name="Predicted", line=dict(color="green")))
     fig.update_layout(
-        title='Stock Close Prices Over Time',
-        xaxis_title='Date',
-        yaxis_title='Close Price',
-        xaxis_rangeslider_visible=True
+        title=f"{selected_company} Stock Price Prediction",
+        xaxis_title="Date",
+        yaxis_title="Price",
+        xaxis_rangeslider_visible=True,  # Enable range slider
+        xaxis=dict(rangeselector=dict(  # Add zoom buttons
+            buttons=list([
+                dict(count=1, label="1m", step="month", stepmode="backward"),
+                dict(count=6, label="6m", step="month", stepmode="backward"),
+                dict(count=1, label="1y", step="year", stepmode="backward"),
+                dict(step="all")
+            ])
+        ))
     )
     st.plotly_chart(fig)
 
-plot_raw_data()
+    # Display forecasted data in a scrollable table
+    st.subheader("Forecasted Data (Date-Wise Table)")
+    forecast["ds"] = pd.to_datetime(forecast["ds"])  # Ensure 'ds' is in datetime format
+    filtered_forecast = forecast[forecast["ds"] >= "2024-05-01"]  # Filter data from May 2024 onward
 
-# Prepare data for Prophet
-df_train = data[['Date', 'Close']]
+    # Rename columns for better readability
+    filtered_forecast = filtered_forecast.rename(columns={"ds": "Date", "yhat": "Predicted Price"})
 
-# Check for missing or non-numeric values in the 'Close' column
-if df_train['Close'].isnull().sum() > 0:
-    st.error("The 'Close' column contains missing values. Please try another stock.")
-    st.stop()
+    # Display the table
+    st.dataframe(filtered_forecast[["Date", "Predicted Price"]], height=400)  # Scrollable table with a fixed height
 
-# Ensure the 'Close' column is numeric
-df_train['Close'] = pd.to_numeric(df_train['Close'], errors='coerce')
+    # Add links to trusted stock trading platforms
+    st.subheader("Proceed to Buy or Sell Stocks")
+    st.write("You can buy or sell stocks on trusted platforms. Click the buttons below to proceed:")
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.markdown("[![Robinhood](https://img.shields.io/badge/Robinhood-Trade-green?style=for-the-badge)](https://robinhood.com)")
+    with col2:
+        st.markdown("[![E*TRADE](https://img.shields.io/badge/E*TRADE-Trade-blue?style=for-the-badge)](https://us.etrade.com)")
+    with col3:
+        st.markdown("[![Zerodha](https://img.shields.io/badge/Zerodha-Trade-orange?style=for-the-badge)](https://zerodha.com)")
 
-# Drop rows with missing or invalid values
-df_train = df_train.dropna()
-
-# Rename columns for Prophet
-df_train = df_train.rename(columns={"Date": "ds", "Close": "y"})
-
-# Train Prophet model
-m = Prophet()
-m.fit(df_train)
-
-# Make future predictions
-future = m.make_future_dataframe(periods=period)
-forecast = m.predict(future)
-
-# Filter forecast for the next 1 year
-forecast_next_year = forecast[forecast['ds'] > TODAY]
-
-# Display forecast data for the next 1 year
-st.subheader('1-Year Forecast Data')
-st.write(forecast_next_year[['ds', 'yhat', 'yhat_lower', 'yhat_upper']].head(10))  # Display first 10 rows
-
-# Plot forecast
-st.write(f'Forecast plot for the next {n_years} years')
-fig1 = plot_plotly(m, forecast)
-st.plotly_chart(fig1)
-
-# Plot forecast components
-st.write("Forecast components")
-fig2 = m.plot_components(forecast)
-st.pyplot(fig2)
+except Exception as e:
+    st.error(f"Error: {e}")
