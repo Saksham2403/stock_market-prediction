@@ -7,7 +7,7 @@ import plotly.graph_objects as go
 # App title
 st.title("Stock Price Prediction Application")
 st.write("""
-This app predicts stock prices for Apple (AAPL), Microsoft (MSFT), Google (GOOGL), Amazon (AMZN), Tesla (TSLA), Reliance (RELIANCE.NS), and Tata Motors (TATAMOTORS.NS) using Facebook's Prophet library.
+This app predicts stock prices for Apple (AAPL), Microsoft (MSFT), Google (GOOGL), Amazon (AMZN), Tesla (TSLA), Reliance (RELIANCE.NS), Tata Motors (TATAMOTORS.NS), Zomato (ZOMATO.NS), and Bajaj Finance (BAJFINANCE.NS) using Facebook's Prophet library.
 """)
 
 # Sidebar for user input
@@ -19,7 +19,9 @@ ticker_options = {
     "Amazon": "AMZN",
     "Tesla": "TSLA",
     "Reliance": "RELIANCE.NS",
-    "Tata Motors": "TATAMOTORS.NS"
+    "Tata Motors": "TATAMOTORS.NS",
+    "Zomato": "ZOMATO.NS",
+    "Bajaj Finance": "BAJFINANCE.NS"
 }
 selected_company = st.sidebar.selectbox("Select a Company", list(ticker_options.keys()))
 ticker = ticker_options[selected_company]
@@ -76,14 +78,21 @@ try:
 
     # Display forecasted data in a scrollable table
     st.subheader("Forecasted Data (Date-Wise Table)")
-    forecast["ds"] = pd.to_datetime(forecast["ds"])  # Ensure 'ds' is in datetime format
-    filtered_forecast = forecast[forecast["ds"] >= "2024-05-01"]  # Filter data from May 2024 onward
 
-    # Rename columns for better readability
-    filtered_forecast = filtered_forecast.rename(columns={"ds": "Date", "yhat": "Predicted Price"})
+    # Ensure 'ds' is in datetime format for both datasets
+    forecast["ds"] = pd.to_datetime(forecast["ds"])
+    prophet_data["ds"] = pd.to_datetime(prophet_data["ds"])
+
+    # Merge actual prices with forecasted data
+    merged_data = pd.merge(forecast, prophet_data, on="ds", how="left")
+    merged_data = merged_data.rename(columns={"ds": "Date", "y": "Actual Price", "yhat": "Predicted Price"})
+
+    # Filter data to show only relevant columns and dates from May 2024 onward
+    filtered_forecast = merged_data[["Date", "Actual Price", "Predicted Price"]]
+    filtered_forecast = filtered_forecast[filtered_forecast["Date"] >= "2024-05-01"]
 
     # Display the table
-    st.dataframe(filtered_forecast[["Date", "Predicted Price"]], height=400)  # Scrollable table with a fixed height
+    st.dataframe(filtered_forecast, height=400)  # Scrollable table with a fixed height
 
     # Add links to trusted stock trading platforms
     st.subheader("Proceed to Buy or Sell Stocks")
